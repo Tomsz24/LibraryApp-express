@@ -1,0 +1,25 @@
+echo "Running Prettier..."
+if ! npx prettier --write .
+then
+  echo "Prettier failed."
+  exit 1
+fi
+echo "Prettier passed."
+
+echo "Running tsc --noEmit..."
+if ! npx tsc --noEmit
+then
+  echo "TypeScript check failed."
+  exit 1
+fi
+echo "TypeScript check passed."
+
+echo "Running ESLint..."
+if ! npm run lint
+then
+  echo "ESLint failed."
+  exit 1
+fi
+echo "ESLint passed."
+
+echo "All checks passed. Proceeding with commit."

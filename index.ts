@@ -8,6 +8,7 @@ import booksRoute from "./src/routing/books/books";
 import rentRoute from "./src/routing/rent/rent";
 import logsRoute from "./src/routing/logs/logs";
 import usersRoute from "./src/routing/users/users";
+import dotenv from "dotenv";
 
 // CONNECTION TEST FOR MYSQL DATABASE
 (async () => {
@@ -23,6 +24,7 @@ import usersRoute from "./src/routing/users/users";
 
 const app = express();
 const port = process.env.PORT || 3000;
+dotenv.config();
 
 app.use(helmet());
 app.use(cors());

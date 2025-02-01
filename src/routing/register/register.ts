@@ -3,7 +3,8 @@ import bcrypt from "bcrypt";
 import { v4 as uuidv4 } from "uuid";
 import pool from "../../../database/db";
 import nodemailer from "nodemailer";
-import {RowDataPacket} from "mysql2";
+import { RowDataPacket } from "mysql2";
+
 const router = Router();
 
 interface User {
@@ -25,7 +26,6 @@ interface User {
   activation_token?: string;
   activation_token_expires?: Date;
 }
-
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -57,7 +57,7 @@ router.post(
         [email, username],
       );
 
-      if ((rows).length > 0) {
+      if (rows.length > 0) {
         return res.status(400).json({ error: "User already exist" });
       }
 
@@ -71,17 +71,16 @@ router.post(
       // creating uniq ID
       const id = uuidv4();
 
-      const sql = `INSERT INTO users (
-                   id, 
-                   username, 
-                   name, 
-                   surname, 
-                   email, 
-                   password,
-                   activation_token,
-                   activation_token_expires,
-                   avatar_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const sql = `INSERT INTO users (id,
+                                      username,
+                                      name,
+                                      surname,
+                                      email,
+                                      password,
+                                      activation_token,
+                                      activation_token_expires,
+                                      avatar_url)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
       const data = [
         id,
@@ -98,7 +97,7 @@ router.post(
       await pool.execute(sql, data);
 
       //sending email
-      const activationLink = `http://localhost:3000/activate/${activationToken}`;
+      const activationLink = `http://localhost:3000/register/activate/${activationToken}`;
       await transporter.sendMail({
         from: "Library App by Tomasz Wojciechowski <tomaszwojciechowski244@gmail.com>",
         to: email,
@@ -120,5 +119,33 @@ router.post(
     }
   },
 );
+
+router.get("/activate/:token", async (req, res) => {
+  const { token } = req.params;
+  console.log(req.params);
+  try {
+    const [rows] = await pool.query<User[] & RowDataPacket[]>(
+      "SELECT * FROM users WHERE activation_token = ? AND activation_token_expires > NOW()",
+      [token],
+    );
+    const user = rows[0];
+
+    await pool.query(
+      `UPDATE users
+       SET is_active                = 1,
+           activation_token         = NULL,
+           activation_token_expires = NULL
+       WHERE id = ?`,
+      [user.id],
+    );
+
+    return res
+      .status(200)
+      .json({ message: "User activated", isActive: user.is_active });
+  } catch (err) {
+    console.error("Activation error: ", err);
+    res.status(500).json({ error: "Activation error" });
+  }
+});
 
 export default router;

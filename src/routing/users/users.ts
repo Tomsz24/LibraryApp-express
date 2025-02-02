@@ -68,4 +68,41 @@ router.put('/:id', authenticateUser, async (req: Request, res: Response) => {
   }
 });
 
+router.delete('/:id', authenticateUser, async (req: Request, res: Response) => {
+  const userId = req.params.id;
+  const requesterId = req.user?.id;
+
+  try {
+    if (userId !== requesterId) {
+      return res.status(403).json({
+        error: 'Forbidden: You can only delete your own account',
+      });
+    }
+
+    const [rows] = await db.query<RowDataPacket[]>(
+      `SELECT id
+       FROM usesrs
+       WHERE id = ?`,
+      [userId],
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await db.query(
+      `
+        DELETE
+        FROM users
+        WHERE id = ?
+    `,
+      [userId],
+    );
+    res.status(200).json({ message: 'User deleted' });
+  } catch (err) {
+    console.error('Error deleting user: ', err);
+    return res.status(500).json({ error: 'Error deleting user' });
+  }
+});
+
 export default router;

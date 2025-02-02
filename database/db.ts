@@ -1,5 +1,5 @@
-import mysql, { Pool } from "mysql2/promise";
-import { config } from "dotenv";
+import mysql, { Pool } from 'mysql2/promise';
+import { config } from 'dotenv';
 
 config();
 

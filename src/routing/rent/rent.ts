@@ -1,8 +1,8 @@
-import express from "express";
+import express from 'express';
 const router = express.Router();
 
-router.get("/", (req, res) => {
-  res.send("rent");
+router.get('/', (req, res) => {
+  res.send('rent');
 });
 
 export default router;

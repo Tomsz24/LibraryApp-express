@@ -1,9 +1,9 @@
-import { Router, Request, Response } from "express";
-import bcrypt from "bcrypt";
-import { v4 as uuidv4 } from "uuid";
-import pool from "../../../database/db";
-import nodemailer from "nodemailer";
-import { RowDataPacket } from "mysql2";
+import { Router, Request, Response } from 'express';
+import bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
+import pool from '../../../database/db';
+import nodemailer from 'nodemailer';
+import { RowDataPacket } from 'mysql2';
 
 const router = Router();
 
@@ -28,37 +28,37 @@ interface User {
 }
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  service: 'gmail',
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_PASSWORD,
   },
 });
 
-router.get("/", (req, res) => {
-  res.send("register");
+router.get('/', (req, res) => {
+  res.send('register');
 });
 
 router.post(
-  "/",
+  '/',
   async (req: Request, res: Response): Promise<void | Response> => {
     console.log(req.body);
     const { username, password, name, email, surname, avatar_url } = req.body;
 
     // simple verify (rest validation is on frontend)
     if (!username || !password || !name || !email || !surname) {
-      return res.status(400).json({ error: "All fields are required" });
+      return res.status(400).json({ error: 'All fields are required' });
     }
 
     try {
       // Verify if user already exist
       const [rows] = await pool.query<User[] & RowDataPacket[]>(
-        "SELECT * FROM users WHERE email = ? OR username = ?",
+        'SELECT * FROM users WHERE email = ? OR username = ?',
         [email, username],
       );
 
       if (rows.length > 0) {
-        return res.status(400).json({ error: "User already exist" });
+        return res.status(400).json({ error: 'User already exist' });
       }
 
       // hashing password
@@ -99,9 +99,9 @@ router.post(
       //sending email
       const activationLink = `http://localhost:3000/register/activate/${activationToken}`;
       await transporter.sendMail({
-        from: "Library App by Tomasz Wojciechowski <tomaszwojciechowski244@gmail.com>",
+        from: 'Library App by Tomasz Wojciechowski <tomaszwojciechowski244@gmail.com>',
         to: email,
-        subject: "Activate your account",
+        subject: 'Activate your account',
         html: `
         <h1>Activate your account</h1>
         <p>Please click on the link below to activate your account</p>
@@ -110,22 +110,22 @@ router.post(
       });
 
       res.status(201).json({
-        message: "User created and activation email has been send",
+        message: 'User created and activation email has been send',
         userId: id,
       });
     } catch (err) {
-      console.error("Registration error: ", err);
-      res.status(500).json({ error: "Registration error" });
+      console.error('Registration error: ', err);
+      res.status(500).json({ error: 'Registration error' });
     }
   },
 );
 
-router.get("/activate/:token", async (req, res) => {
+router.get('/activate/:token', async (req, res) => {
   const { token } = req.params;
   console.log(req.params);
   try {
     const [rows] = await pool.query<User[] & RowDataPacket[]>(
-      "SELECT * FROM users WHERE activation_token = ? AND activation_token_expires > NOW()",
+      'SELECT * FROM users WHERE activation_token = ? AND activation_token_expires > NOW()',
       [token],
     );
     const user = rows[0];
@@ -141,10 +141,10 @@ router.get("/activate/:token", async (req, res) => {
 
     return res
       .status(200)
-      .json({ message: "User activated", isActive: user.is_active });
+      .json({ message: 'User activated', isActive: user.is_active });
   } catch (err) {
-    console.error("Activation error: ", err);
-    res.status(500).json({ error: "Activation error" });
+    console.error('Activation error: ', err);
+    res.status(500).json({ error: 'Activation error' });
   }
 });
 

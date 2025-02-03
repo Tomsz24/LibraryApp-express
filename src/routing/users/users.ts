@@ -90,12 +90,39 @@ router.delete('/:id', authenticateUser, async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    const [borrowedBooks] = await db.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS active_borrowed_books
+       FROM borrowed_books
+       WHERE user_id = ?
+         AND status = 'borrowed'
+      `,
+      [userId],
+    );
+
+    console.log(borrowedBooks[0]);
+
+    if (borrowedBooks[0].active_borrowed_books > 0) {
+      return res.status(403).json({
+        error:
+          'Forbidden: You can not delete your account because you have borrowed books',
+      });
+    }
+
     await db.query(
       `
-        DELETE
-        FROM users
-        WHERE id = ?
-    `,
+          UPDATE borrowed_books
+          SET user_id = NULL
+          WHERE user_id = ?
+      `,
+      [userId],
+    );
+
+    await db.query(
+      `
+          DELETE
+          FROM users
+          WHERE id = ?
+      `,
       [userId],
     );
     res.status(200).json({ message: 'User deleted' });

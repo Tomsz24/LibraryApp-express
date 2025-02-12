@@ -47,7 +47,7 @@ export const authenticateAdmin = async (
     ) as JwtPayload;
 
     const [rows] = await db.query<User[] & RowDataPacket[]>(
-      'SELECT id, isAdmin FROM users WHERE id = ?',
+      'SELECT id, isAdmin FROM Users WHERE id = ?',
       [decoded.id],
     );
 

@@ -2,12 +2,12 @@ import express, { Request, Response } from 'express';
 import pool from './database/db';
 import helmet from 'helmet';
 import cors from 'cors';
-import loginRoute from './src/routing/login/login';
-import registerRoute from './src/routing/register/register';
-import booksRoute from './src/routing/books/books';
-import rentRoute from './src/routing/rent/rent';
-import logsRoute from './src/routing/logs/logs';
-import usersRoute from './src/routing/users/users';
+import loginRoute from './src/routes/login/login';
+import registerRoute from './src/routes/register/register';
+import booksRoute from './src/routes/books/books';
+import rentRoute from './src/routes/rent/rent';
+import logsRoute from './src/routes/logs/logs';
+import usersRoute from './src/routes/users/users';
 import dotenv from 'dotenv';
 
 // CONNECTION TEST FOR MYSQL DATABASE
@@ -23,7 +23,7 @@ import dotenv from 'dotenv';
 })();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3000;
 dotenv.config();
 
 app.use(helmet());

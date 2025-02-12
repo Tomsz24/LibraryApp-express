@@ -26,8 +26,8 @@ interface Book {
   isbn: string;
   publicationYear: number;
   pages: number;
-  rating: number;
-  ratingsCount: number;
+  rating?: number;
+  ratingsCount?: number;
   coverUrl?: string;
   authors: string[];
   genres: string[];
@@ -47,16 +47,18 @@ interface AddBookRequestBody {
   publicationYear: number;
   pages: number;
   rating: number;
-  authors: { firstName: string; lastName: string }[];
+  ratingCount: number;
+  coverUrl: string | null;
+  language: string;
+  publisher: string;
+  authors: {
+    firstName: string;
+    lastName: string;
+    birth_date?: string;
+    nationality?: string;
+  }[];
   genres: string[];
 }
-
-type TypedRequest<TBody> = Request<
-  Record<string, never>,
-  unknown,
-  TBody,
-  Record<string, never>
->;
 
 export const fetchBooks = async (params: FetchBooksParams): Promise<Book[]> => {
   const { limit, offset, orderBy = 'title', orderDirection = 'ASC' } = params;
@@ -73,7 +75,7 @@ export const fetchBooks = async (params: FetchBooksParams): Promise<Book[]> => {
              b.publication_year,
              b.pages,
              b.rating,
-             b.ratings_count,
+             b.rating_count,
              b.cover_url,
              GROUP_CONCAT(DISTINCT CONCAT(a.first_name, ' ', a.last_name) SEPARATOR ', ') AS authors,
              GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ')                                 AS genres
@@ -119,6 +121,13 @@ router.get('/', async (req: Request, res: Response) => {
 
     const books = await fetchBooks({ limit, offset });
 
+    if (books.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No books found',
+      });
+    }
+
     res.status(200).json({
       success: true,
       page,
@@ -131,122 +140,190 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+interface AddBookResponseBody {
+  success: boolean;
+  message: string;
+}
+
 router.post(
   '/addBook',
   authenticateAdmin,
-  async (req: TypedRequest<AddBookRequestBody>, res: Response) => {
+  async (
+    req: Request<
+      Record<string, never>,
+      AddBookResponseBody,
+      AddBookRequestBody
+    >,
+    res: Response<AddBookResponseBody>,
+  ) => {
     const {
       title,
       description,
       isbn,
       publicationYear,
       pages,
-      rating,
+      rating = 0,
+      ratingCount = 0,
+      coverUrl = '',
+      language,
+      publisher,
       authors,
       genres,
     } = req.body;
 
-    // 1. Ręczna walidacja danych wejściowych
+    // Walidacja danych wejściowych
+    if (!title || typeof title !== 'string' || title.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or missing 'title'. It must be a non-empty string.",
+      });
+    }
+
     if (
-      !title ||
       !description ||
-      !isbn ||
-      !publicationYear ||
-      !pages ||
-      !rating ||
-      !authors ||
-      !genres
+      typeof description !== 'string' ||
+      description.trim() === ''
     ) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'Missing required fields.' });
-    }
-
-    if (typeof isbn !== 'string' || isbn.length !== 13) {
       return res.status(400).json({
         success: false,
-        message: 'ISBN must be a 13-character string.',
+        message:
+          "Invalid or missing 'description'. It must be a non-empty string.",
+      });
+    }
+
+    if (!isbn || typeof isbn !== 'string' || isbn.length > 20) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid or missing 'isbn'. It must be a string with a maximum length of 20 characters.",
       });
     }
 
     if (
-      !Array.isArray(authors) ||
-      authors.length === 0 ||
-      !Array.isArray(genres) ||
-      genres.length === 0
+      !publicationYear ||
+      typeof publicationYear !== 'number' ||
+      publicationYear < 0
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Authors and genres must be non-empty arrays.',
+        message:
+          "Invalid or missing 'publicationYear'. It must be a positive number.",
       });
     }
 
-    const connection = await db.getConnection();
-    await connection.beginTransaction();
+    if (!pages || typeof pages !== 'number' || pages <= 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid or missing 'pages'. It must be a positive number greater than zero.",
+      });
+    }
+
+    if (!Array.isArray(authors) || authors.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or missing 'authors'. It must be a non-empty array.",
+      });
+    }
+
+    if (!Array.isArray(genres) || genres.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or missing 'genres'. It must be a non-empty array.",
+      });
+    }
+
+    const connection = await db.getConnection(); // Połączenie z bazą danych
 
     try {
-      // 2. Sprawdź, czy książka już istnieje
-      const [existingBooks] = await connection.query<RowDataPacket[]>(
-        'SELECT id FROM Books WHERE isbn = ? OR title = ?',
-        [isbn, title],
-      );
+      await connection.beginTransaction(); // Rozpoczęcie transakcji
 
-      if (existingBooks.length > 0) {
-        throw new Error('Book with the same ISBN or title already exists.');
+      // Dodanie języka lub znalezienie istniejącego
+      let languageId!: number;
+      const [existingLanguage] = await connection.query<RowDataPacket[]>(
+        'SELECT id FROM Languages WHERE name = ?',
+        [language],
+      );
+      if (existingLanguage.length > 0) {
+        languageId = existingLanguage[0].id;
+      } else {
+        const [languageResult] = await connection.query<ResultSetHeader>(
+          'INSERT INTO Languages (name) VALUES (?)',
+          [language],
+        );
+        languageId = languageResult.insertId;
       }
 
-      // 3. Dodaj autorów i zapisuj ich ID
-      const authorIds: number[] = [];
-      for (const author of authors) {
-        const { firstName, lastName } = author;
+      // Dodanie wydawcy lub znalezienie istniejącego
+      let publisherId!: number;
+      const [existingPublisher] = await connection.query<RowDataPacket[]>(
+        'SELECT id FROM Publishers WHERE name = ?',
+        [publisher],
+      );
+      if (existingPublisher.length > 0) {
+        publisherId = existingPublisher[0].id;
+      } else {
+        const [publisherResult] = await connection.query<ResultSetHeader>(
+          'INSERT INTO Publishers (name) VALUES (?)',
+          [publisher],
+        );
+        publisherId = publisherResult.insertId;
+      }
 
-        const [existingAuthors] = await connection.query<RowDataPacket[]>(
-          'SELECT id FROM authors WHERE first_name = ? AND last_name = ?',
-          [firstName, lastName],
+      // Dodanie książki
+      const [bookResult] = await connection.query<ResultSetHeader>(
+        `INSERT INTO Books
+         (title, description, isbn, publication_year, pages, language_id, publisher_id, rating, rating_count, cover_url,
+          availability_status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', NOW(), NOW())`,
+        [
+          title,
+          description,
+          isbn,
+          publicationYear,
+          pages,
+          languageId,
+          publisherId,
+          rating,
+          ratingCount,
+          coverUrl,
+        ],
+      );
+      const bookId = bookResult.insertId;
+
+      // Dodanie autorów
+      const authorIds: number[] = [];
+      for (const { firstName, lastName, birth_date, nationality } of authors) {
+        const [existingAuthor] = await connection.query<RowDataPacket[]>(
+          `SELECT id
+           FROM Authors
+           WHERE first_name = ?
+             AND last_name = ?
+             AND (birth_date = ? OR (birth_date IS NULL AND ? IS NULL))
+             AND (nationality = ? OR (nationality IS NULL AND ? IS NULL))`,
+          [
+            firstName,
+            lastName,
+            birth_date,
+            birth_date,
+            nationality,
+            nationality,
+          ],
         );
 
-        if (existingAuthors.length > 0) {
-          // Autor już istnieje
-          authorIds.push(existingAuthors[0].id);
+        if (existingAuthor.length > 0) {
+          authorIds.push(existingAuthor[0].id);
         } else {
-          // Dodaj nowego autora
           const [authorResult] = await connection.query<ResultSetHeader>(
-            'INSERT INTO authors (first_name, last_name) VALUES (?, ?)',
-            [firstName, lastName],
+            `INSERT INTO Authors (first_name, last_name, birth_date, nationality, created_at, updated_at)
+             VALUES (?, ?, ?, ?, NOW(), NOW())`,
+            [firstName, lastName, birth_date, nationality],
           );
           authorIds.push(authorResult.insertId);
         }
       }
 
-      // 4. Dodaj gatunki i zapisuj ich ID
-      const genreIds: number[] = [];
-      for (const genre of genres) {
-        const [existingGenres] = await connection.query<RowDataPacket[]>(
-          'SELECT id FROM genres WHERE name = ?',
-          [genre],
-        );
-
-        if (existingGenres.length > 0) {
-          // Gatunek już istnieje
-          genreIds.push(existingGenres[0].id);
-        } else {
-          // Dodaj nowy gatunek
-          const [genreResult] = await connection.query<ResultSetHeader>(
-            'INSERT INTO genres (name) VALUES (?)',
-            [genre],
-          );
-          genreIds.push(genreResult.insertId);
-        }
-      }
-
-      // 5. Dodaj książkę
-      const [bookResult] = await connection.query<ResultSetHeader>(
-        'INSERT INTO Books (title, description, isbn, publication_year, pages, rating) VALUES (?, ?, ?, ?, ?, ?)',
-        [title, description, isbn, publicationYear, pages, rating],
-      );
-      const bookId = bookResult.insertId;
-
-      // 6. Powiąż książkę z autorami
+      // Przypisanie autorów do książki
       for (const authorId of authorIds) {
         await connection.query(
           'INSERT INTO book_authors (book_id, author_id) VALUES (?, ?)',
@@ -254,29 +331,45 @@ router.post(
         );
       }
 
-      // 7. Powiąż książkę z gatunkami
-      for (const genreId of genreIds) {
+      // Dodanie gatunków i przypisanie do książki
+      for (const genre of genres) {
+        let genreId!: number;
+        const [existingGenre] = await connection.query<RowDataPacket[]>(
+          'SELECT id FROM Genres WHERE name = ?',
+          [genre],
+        );
+        if (existingGenre.length > 0) {
+          genreId = existingGenre[0].id;
+        } else {
+          const [genreResult] = await connection.query<ResultSetHeader>(
+            `INSERT INTO Genres (name, created_at, updated_at)
+             VALUES (?, NOW(), NOW())`,
+            [genre],
+          );
+          genreId = genreResult.insertId;
+        }
         await connection.query(
-          'INSERT INTO book_genres (book_id, genre_id) VALUES (?, ?)',
+          `INSERT INTO book_genres (book_id, genre_id)
+           VALUES (?, ?)`,
           [bookId, genreId],
         );
       }
 
-      // 8. Zatwierdzenie transakcji
+      // Zatwierdzenie transakcji
       await connection.commit();
-      return res
+
+      res
         .status(201)
         .json({ success: true, message: 'Book added successfully.' });
     } catch (error) {
-      // Wycofanie zmian w przypadku błędu
-      await connection.rollback();
-      return res.status(500).json({
+      await connection.rollback(); // Cofnięcie transakcji w razie błędu
+      res.status(500).json({
         success: false,
         message:
           error instanceof Error ? error.message : 'Internal server error.',
       });
     } finally {
-      connection.release();
+      connection.release(); // Zakończenie połączenia
     }
   },
 );
@@ -379,30 +472,30 @@ router.delete(
       //DELETING RELATIONS IN book_authors
       await db.query(
         `
-          DELETE
-          FROM book_authors
-          WHERE book_id = ?
-      `,
+            DELETE
+            FROM book_authors
+            WHERE book_id = ?
+        `,
         [id],
       );
 
       //DELETING RELATIONS FROM book_genres
       await db.query(
         `
-          DELETE
-          FROM book_genres
-          WHERE book_id = ?
-      `,
+            DELETE
+            FROM book_genres
+            WHERE book_id = ?
+        `,
         [id],
       );
 
       //DELETE BOOK FROM books
       await db.query(
         `
-          DELETE
-          FROM books
-          WHERE id = ?
-      `,
+            DELETE
+            FROM books
+            WHERE id = ?
+        `,
         [id],
       );
 

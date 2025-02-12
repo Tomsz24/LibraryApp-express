@@ -18,7 +18,7 @@ router.post('/request', async (req: Request, res: Response) => {
     // FIND USER IN DATABASE VIA EMAIL
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT *
-       FROM users
+       FROM Users
        WHERE email = ?`,
       [email],
     );
@@ -70,18 +70,19 @@ router.post('/request', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/confirm/:token', async (req: Request, res: Response) => {
-  const { token } = req.params;
-  const { newPassword } = req.body;
+router.post('/change', async (req: Request, res: Response) => {
+  const { token, newPassword } = req.body;
 
-  if (!newPassword) {
-    return res.status(400).json({ error: 'New password is missing' });
+  if (!token || !newPassword) {
+    return res
+      .status(400)
+      .json({ error: 'Token and new password are required' });
   }
 
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT *
-       FROM users
+       FROM Users
        WHERE reset_password_token = ?
          AND reset_password_expires > NOW()`,
       [token],
@@ -92,6 +93,14 @@ router.post('/confirm/:token', async (req: Request, res: Response) => {
     }
 
     const user = rows[0];
+
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      return res
+        .status(400)
+        .json({ error: 'New password cannot be the same as the old password' });
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await pool.query(
@@ -99,14 +108,14 @@ router.post('/confirm/:token', async (req: Request, res: Response) => {
        SET password               = ?,
            reset_password_token   = NULL,
            reset_password_expires = NULL
-       WHERE id = ? `,
+       WHERE id = ?`,
       [hashedPassword, user.id],
     );
 
     res.status(200).json({ message: 'Password reset successful' });
   } catch (err) {
-    console.error('Error during password reset: ', err);
-    res.status(500).json({ error: 'Error during password reset' });
+    console.error('Error during password reset:', err);
+    res.status(500).json({ error: 'Error resetting password' });
   }
 });
 

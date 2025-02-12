@@ -21,7 +21,7 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT id, email, password, is_active
-       FROM users
+       FROM Users
        WHERE email = ?`,
       [email],
     );

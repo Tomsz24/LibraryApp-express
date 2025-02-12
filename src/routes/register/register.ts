@@ -42,8 +42,9 @@ router.get('/', (req, res) => {
 router.post(
   '/',
   async (req: Request, res: Response): Promise<void | Response> => {
-    console.log(req.body);
     const { username, password, name, email, surname, avatar_url } = req.body;
+    const normalizedEmail = email.toLowerCase();
+    const normalizedUsername = username.toLowerCase();
 
     // simple verify (rest validation is on frontend)
     if (!username || !password || !name || !email || !surname) {
@@ -53,12 +54,28 @@ router.post(
     try {
       // Verify if user already exist
       const [rows] = await pool.query<User[] & RowDataPacket[]>(
-        'SELECT * FROM users WHERE email = ? OR username = ?',
-        [email, username],
+        'SELECT * FROM Users WHERE LOWER(email) = ? OR LOWER(username) = ?',
+        [normalizedEmail, normalizedUsername],
       );
 
       if (rows.length > 0) {
-        return res.status(400).json({ error: 'User already exist' });
+        const existingUsername = rows[0].username.toLowerCase();
+        const existingEmail = rows[0].email.toLowerCase();
+
+        let errorMessage = 'User with ';
+
+        if (
+          existingEmail === normalizedEmail &&
+          existingUsername === normalizedUsername
+        ) {
+          errorMessage += 'this email and username already exists.';
+        } else if (existingEmail === normalizedEmail) {
+          errorMessage += 'this email already exists.';
+        } else if (existingUsername === normalizedUsername) {
+          errorMessage += 'this username already exists.';
+        }
+
+        return res.status(400).json({ error: errorMessage });
       }
 
       // hashing password

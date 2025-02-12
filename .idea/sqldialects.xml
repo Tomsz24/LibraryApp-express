@@ -2,7 +2,7 @@
 <project version="4">
   <component name="SqlDialectMappings">
     <file url="file://$PROJECT_DIR$/index.ts" dialect="GenericSQL" />
-    <file url="file://$PROJECT_DIR$/src/routing/users/users.ts" dialect="GenericSQL" />
+    <file url="file://$PROJECT_DIR$/src/routes/users/users.ts" dialect="GenericSQL" />
     <file url="PROJECT" dialect="MySQL" />
   </component>
 </project>

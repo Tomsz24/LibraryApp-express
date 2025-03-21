@@ -93,7 +93,7 @@ export const fetchBooks = async (params: FetchBooksParams): Promise<Book[]> => {
       LIMIT ? OFFSET ?;
   `;
 
-  const [rows] = await db.execute<RawBookRow[] & RowDataPacket[]>(query, [
+  const [rows] = await db.query<RawBookRow[] & RowDataPacket[]>(query, [
     limit,
     offset,
   ]);
@@ -388,13 +388,13 @@ router.get('/:id', async (req: Request<{ id: string }>, res: Response) => {
                  b.title,
                  b.description,
                  b.isbn,
-                 b.publication_year                                       AS publicationYear,
+                 b.publication_year                                            AS publicationYear,
                  b.pages,
                  b.rating,
                  b.availability_status,
                  b.cover_url,
-                 GROUP_CONCAT(DISTINCT CONCAT(a.first_name, a.last_name)) AS authors,
-                 GROUP_CONCAT(DISTINCT g.name)                            AS genres
+                 GROUP_CONCAT(DISTINCT CONCAT(a.first_name, ' ', a.last_name)) AS authors,
+                 GROUP_CONCAT(DISTINCT g.name)                                 AS genres
           FROM Books b
                    LEFT JOIN book_authors ba ON b.id = ba.book_id
                    LEFT JOIN authors a ON ba.author_id = a.id
@@ -421,6 +421,7 @@ router.get('/:id', async (req: Request<{ id: string }>, res: Response) => {
       availabilityStatus: bookRow[0].availability_status,
       coverUrl: bookRow[0].cover_url || null,
       genres: bookRow[0].genres ? bookRow[0].genres.split(', ') : [],
+      authors: bookRow[0].authors ? bookRow[0].authors.split(', ') : [],
     };
 
     return res.status(200).json({ success: true, data: book });

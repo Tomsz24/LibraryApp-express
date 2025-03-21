@@ -8,6 +8,7 @@ import booksRoute from './src/routes/books/books';
 import rentRoute from './src/routes/rent/rent';
 import logsRoute from './src/routes/logs/logs';
 import usersRoute from './src/routes/users/users';
+import resetRoute from './src/routes/reset/reset';
 import dotenv from 'dotenv';
 
 // CONNECTION TEST FOR MYSQL DATABASE
@@ -27,7 +28,14 @@ const port = 3000;
 dotenv.config();
 
 app.use(helmet());
-app.use(cors());
+app.use(
+  cors({
+    origin: 'http://localhost:5173', // Zezwól tylko na żądania z Twojego frontendu
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Dozwolone metody
+    credentials: true, // Obsługa cookies, jeśli potrzebne
+  }),
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -38,6 +46,7 @@ app.use('/books', booksRoute);
 app.use('/rent', rentRoute);
 app.use('/logs', logsRoute);
 app.use('/users', usersRoute);
+app.use('/reset', resetRoute);
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Hello World!');

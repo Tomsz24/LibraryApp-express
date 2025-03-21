@@ -5,6 +5,34 @@ import { authenticateUser } from '../../middlewares/authenticateUser';
 
 const router = Router();
 
+router.get('/', authenticateUser, async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+
+  try {
+    const [rows] = await db.query<RowDataPacket[]>(
+      `SELECT id, email, name, surname
+       FROM users
+       WHERE id = ?`,
+      [userId],
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = rows[0];
+    res.status(200).json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      surname: user.surname,
+    });
+  } catch (error) {
+    console.error('Error getting user: ', error);
+    res.status(500).json({ error: 'Error getting user' });
+  }
+});
+
 router.put('/:id', authenticateUser, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { email, name, surname, avatar } = req.body;

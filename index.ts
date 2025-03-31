@@ -8,6 +8,7 @@ import booksRoute from './src/routes/books/books';
 import rentRoute from './src/routes/rent/rent';
 import logsRoute from './src/routes/logs/logs';
 import usersRoute from './src/routes/users/users';
+import resetRoute from './src/routes/reset/reset';
 import dotenv from 'dotenv';
 import { ErrorHandler } from './src/middlewares/errorHandler';
 
@@ -37,6 +38,14 @@ const port = 5005;
 dotenv.config();
 
 app.use(helmet());
+app.use(
+  cors({
+    origin: 'http://localhost:5173', // Zezwól tylko na żądania z Twojego frontendu
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Dozwolone metody
+    credentials: true, // Obsługa cookies, jeśli potrzebne
+  }),
+);
+
 app.use(redirectToHttps);
 
 app.use(cors());

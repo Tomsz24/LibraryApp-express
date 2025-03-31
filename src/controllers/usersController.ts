@@ -95,7 +95,7 @@ export const deleteUserController = async (
     }
 
     await deleteUser(userId);
-    
+
     res.status(200).json({
       message: 'User deleted successfully',
     });

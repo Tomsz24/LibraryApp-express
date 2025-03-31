@@ -38,6 +38,9 @@ const port = 5005;
 dotenv.config();
 
 app.use(helmet());
+app.use(redirectToHttps);
+
+app.use(cors());
 app.use(
   cors({
     origin: 'http://localhost:5173', // Zezwól tylko na żądania z Twojego frontendu
@@ -67,6 +70,9 @@ app.use('/books', booksRoute);
 app.use('/rent', rentRoute);
 app.use('/logs', logsRoute);
 app.use('/users', usersRoute);
+app.get('/example', (req, res) => {
+  res.json({ message: 'Pierwszy komunikat' });
+});
 app.use('/reset', resetRoute);
 app.get('/example', (req, res) => {
   res.json({ message: 'Pierwszy komunikat' });

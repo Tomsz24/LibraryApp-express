@@ -61,7 +61,12 @@ interface AddBookRequestBody {
 }
 
 export const fetchBooks = async (params: FetchBooksParams): Promise<Book[]> => {
-  const { limit, offset, orderBy = 'title', orderDirection = 'ASC' } = params;
+  const {
+    limit = 10,
+    offset = 1,
+    orderBy = 'title',
+    orderDirection = 'ASC',
+  } = params;
 
   if (!['title', 'rating', 'publication_year'].includes(orderBy)) {
     throw new Error(`Invalid orderBy parameter: ${orderBy}`);
@@ -92,6 +97,13 @@ export const fetchBooks = async (params: FetchBooksParams): Promise<Book[]> => {
       ORDER BY ${orderBy} ${orderDirection}
       LIMIT ? OFFSET ?;
   `;
+  console.log('Executing query with limit:', limit, 'and offset:', offset);
+  if (isNaN(limit) || limit < 0) {
+    throw new Error('Invalid value for LIMIT');
+  }
+  if (isNaN(offset) || offset < 0) {
+    throw new Error('Invalid value for OFFSET');
+  }
 
   const [rows] = await db.query<RawBookRow[] & RowDataPacket[]>(query, [
     limit,

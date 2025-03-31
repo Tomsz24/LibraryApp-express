@@ -54,30 +54,48 @@ export const deleteUserController = async (
   const requesterId = req.user?.id;
 
   try {
-    if (userId !== requesterId) {
-      throw new AppError(
-        'Forbidden: You can only delete your own account',
-        403,
-      );
+    if (!requesterId) {
+      throw new AppError('Requester ID is required but was undefined', 400);
     }
+
+    if (!userId) {
+      throw new AppError('User ID is required but was undefined', 400);
+    }
+
+    const requester = await getUserById(requesterId);
+
+    if (!requester) {
+      throw new AppError('Requester not found', 404);
+    }
+
+    const isRequesterAdmin = requester.isAdmin === 1;
 
     const user = await getUserById(userId);
 
     if (!user) {
-      throw new AppError('User not found', 404);
+      throw new AppError('User to be deleted not found', 404);
     }
 
-    const hasBorrowedBooks = await checkActiveBorrowedBooks(userId);
-
-    if (hasBorrowedBooks) {
+    if (userId !== requesterId && !isRequesterAdmin) {
       throw new AppError(
-        'You cannot deldete your account because of active borrowed books',
+        'Forbidden: You can only delete your own account or have admin privileges',
         403,
       );
     }
 
-    await deleteUser(userId);
+    if (userId === requesterId) {
+      const hasBorrowedBooks = await checkActiveBorrowedBooks(userId);
 
+      if (hasBorrowedBooks) {
+        throw new AppError(
+          'You cannot delete your account because of active borrowed books',
+          403,
+        );
+      }
+    }
+
+    await deleteUser(userId);
+    
     res.status(200).json({
       message: 'User deleted successfully',
     });

@@ -4,4 +4,6 @@ export interface User {
   name: string;
   surname: string;
   avatar_url?: string | null;
+  isAdmin?: boolean;
+  password?: string;
 }

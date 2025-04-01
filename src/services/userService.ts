@@ -5,7 +5,7 @@ export const getUserById = async (
   userId: string,
 ): Promise<RowDataPacket | null> => {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT email, name, surname, avatar_url
+    `SELECT email, name, surname, avatar_url, isAdmin
      FROM Users
      WHERE id = ?`,
     [userId],
@@ -44,7 +44,7 @@ export const checkActiveBorrowedBooks = async (
 ): Promise<boolean> => {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT COUNT(*) AS active_borrowed_books
-     FROM borrowed_books
+     FROM Borrowed_books
      WHERE user_id = ?
        AND status = 'borrowed'`,
     [userId],
@@ -56,7 +56,7 @@ export const checkActiveBorrowedBooks = async (
 export const deleteUser = async (userId: string) => {
   await pool.query(
     `
-        UPDATE borrowed_books
+        UPDATE Borrowed_books
         SET user_id = NULL
         WHERE user_id = ?
     `,

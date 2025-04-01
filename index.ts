@@ -10,6 +10,16 @@ import logsRoute from './src/routes/logs/logs';
 import usersRoute from './src/routes/users/users';
 import resetRoute from './src/routes/reset/reset';
 import dotenv from 'dotenv';
+import { ErrorHandler } from './src/middlewares/errorHandler';
+
+import https from 'https';
+import fs from 'fs';
+import { redirectToHttps } from './src/middlewares/redirectToHttps';
+
+const options = {
+  key: fs.readFileSync('./key.pem'),
+  cert: fs.readFileSync('./cert.pem'),
+};
 
 // CONNECTION TEST FOR MYSQL DATABASE
 (async () => {
@@ -24,10 +34,24 @@ import dotenv from 'dotenv';
 })();
 
 const app = express();
-const port = 3000;
+const port = 5005;
 dotenv.config();
 
 app.use(helmet());
+app.use(redirectToHttps);
+
+app.use(cors());
+app.use(
+  cors({
+    origin: 'http://localhost:5173', // Zezwól tylko na żądania z Twojego frontendu
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Dozwolone metody
+    credentials: true, // Obsługa cookies, jeśli potrzebne
+  }),
+);
+
+app.use(redirectToHttps);
+
+app.use(cors());
 app.use(
   cors({
     origin: 'http://localhost:5173', // Zezwól tylko na żądania z Twojego frontendu
@@ -46,12 +70,20 @@ app.use('/books', booksRoute);
 app.use('/rent', rentRoute);
 app.use('/logs', logsRoute);
 app.use('/users', usersRoute);
+app.get('/example', (req, res) => {
+  res.json({ message: 'Pierwszy komunikat' });
+});
 app.use('/reset', resetRoute);
+app.get('/example', (req, res) => {
+  res.json({ message: 'Pierwszy komunikat' });
+});
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Hello World!');
 });
 
-app.listen(port, () => {
-  console.log(`Server started at http://localhost:${port}`);
+app.use(ErrorHandler);
+
+https.createServer(options, app).listen(port, '0.0.0.0', () => {
+  console.log(`Server started at https://localhost:${port}`);
 });
